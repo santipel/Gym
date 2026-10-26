@@ -171,6 +171,12 @@ section.block>h3{font-size:1.15rem;margin:0 0 .5rem}
 .stage .wt{fill:var(--brass)}
 .stage .cab{stroke:var(--muted);stroke-width:1.5}
 .stage .band{stroke:var(--sage);stroke-width:2.5;stroke-dasharray:4 3}
+.legend .sync{margin-left:auto}
+.legend .sync::before{width:.5rem;height:.5rem;border-radius:50%;border:0;background:var(--line)}
+.legend .sync[data-kind="ok"]::before{background:var(--sage)}
+.legend .sync[data-kind="busy"]::before{background:var(--brass)}
+.legend .sync[data-kind="err"]::before{background:#B23A3A}
+.settings input.txt{display:block;width:100%;margin-top:.2rem;padding:.5rem .6rem;border:1px solid var(--line);border-radius:.45rem;background:var(--field);font-size:16px}
 .toast{position:fixed;left:50%;bottom:calc(1rem + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.6rem 1rem;border-radius:.6rem;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.show{opacity:1}
 @media (max-width:420px){.cell{min-height:3rem;padding:.25rem}.cell .kind{font-size:.6rem}}
@@ -189,7 +195,7 @@ section.block>h3{font-size:1.15rem;margin:0 0 .5rem}
   <div id="storagenote" class="note" hidden>This preview can’t save entries. Once the page is on GitHub Pages, everything you log is saved in that browser.</div>
 
   <div class="cal" id="cal" role="grid" aria-label="42-day plan"></div>
-  <p class="legend"><span class="l-done">Done</span><span class="l-part">Started</span><span class="l-today">Today</span></p>
+  <p class="legend"><span class="l-done">Done</span><span class="l-part">Started</span><span class="l-today">Today</span><span id="syncstat" class="sync" data-kind="off">This device only</span></p>
 
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" data-act="tab" data-t="day" aria-selected="true">Day</button>
@@ -215,6 +221,9 @@ function load(){
 let state = load() || {};
 state.settings = Object.assign({ mode:"gym", wedding:"2026-12-06" }, state.settings || {});
 state.log = state.log || {};
+state.sync = Object.assign({ url:"", key:"", last:0 }, state.sync || {});
+// Entries logged before sync existed get the oldest possible timestamp, so any synced copy wins over them.
+Object.keys(state.log).forEach(function(k){ if(!state.log[k].u) state.log[k].u = 1; });
 let saveTimer = null;
 function save(){
   clearTimeout(saveTimer);
@@ -548,7 +557,13 @@ function renderProgress(){
   h += wpts.length ? '<div class="chart"><p>'+wpts[wpts.length-1].y.toFixed(1)+" kg latest, "+wpts.length+" weigh-ins</p>"+lineChart(wpts,"kg")+"</div>" : '<p class="empty">Log a weigh-in on Sundays to see the line. Stable is the goal: build strength, don’t chase the scale.</p>';
   h += "</section>";
 
-  h += '<section class="block settings"><h3>Your data</h3><p style="margin:0 0 .6rem;color:var(--muted)">Everything is stored only in this browser. Export a backup now and then, and use import to move your log to another phone or laptop.</p>' +
+  h += '<section class="block settings"><h3>Sync between devices</h3>' +
+    '<p style="margin:0 0 .4rem;color:var(--muted)">Connect your Google Sheet to keep your phone and computer in step. Enter the same URL and key on each device.</p>' +
+    '<label>Apps Script web app URL <input class="txt" data-sync="url" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec" value="'+esc(state.sync.url)+'"></label>' +
+    '<label>Sync key <input class="txt" data-sync="key" type="password" autocomplete="off" value="'+esc(state.sync.key)+'"></label>' +
+    '<div class="btnrow">' + (syncOn() ? '<button class="btn" data-act="sync-now">Sync now</button><button class="btn" data-act="sync-connect">Save and reconnect</button><button class="btn danger" data-act="sync-off">Disconnect this device</button>' : '<button class="btn" data-act="sync-connect">Connect and sync</button>') + '</div>' +
+    '<p id="syncmsg" role="status" style="margin:.5rem 0 0;font-size:.9rem;color:var(--muted)">'+esc(syncMessage())+'</p></section>';
+  h += '<section class="block settings"><h3>Your data</h3><p style="margin:0 0 .6rem;color:var(--muted)">'+(syncOn() ? "Entries are saved in this browser and synced to your Google Sheet." : "Entries are saved in this browser only.")+' Export a backup now and then as an extra copy.</p>' +
     '<div class="btnrow"><button class="btn" data-act="export">Export backup</button><label class="btn" style="cursor:pointer">Import backup<input type="file" accept="application/json,.json" data-act="import" hidden></label><button class="btn danger" data-act="reset">Clear all entries</button></div>' +
     '<label>Wedding date <input type="date" data-act="wedding" value="'+esc(state.settings.wedding)+'"></label>' +
     '<p style="margin:0;font-size:.85rem;color:var(--muted)">The 42 days count back from this date. Entries stay tied to calendar dates.</p></section>';
@@ -995,6 +1010,96 @@ function render(){
   if(tab === "day") renderDay(); else if(tab === "progress") renderProgress(); else renderGuide();
 }
 
+/* ---------- Sync between devices (Google Sheets via Apps Script) ---------- */
+const dirty = new Set();
+let syncTimer = null, syncing = false, syncState = {kind:"off", msg:""}, pendingRender = false;
+function syncOn(){ return !!(state.sync.url && state.sync.key); }
+function touchDay(isoKey){ const l = getLog(isoKey); l.u = Date.now(); dirty.add("d:"+isoKey); scheduleSync(); }
+function touchSettings(){ state.settings.u = Date.now(); dirty.add("settings"); scheduleSync(); }
+function scheduleSync(ms){ if(!syncOn()) return; clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, ms == null ? 1500 : ms); }
+function entryFor(k){ return k === "settings" ? state.settings : state.log[k.slice(2)]; }
+function mergeRemote(entries){
+  let changed = false;
+  Object.keys(entries).forEach(function(k){
+    const r = entries[k]; if(!r || typeof r !== "object") return;
+    const local = entryFor(k), ru = r.u || 0, lu = local ? (local.u || 0) : -1;
+    if(k !== "settings" && k.indexOf("d:") !== 0) return;
+    if(ru > lu){
+      if(k === "settings"){ state.settings = Object.assign({}, state.settings, r); }
+      else state.log[k.slice(2)] = r;
+      dirty.delete(k); changed = true;
+    } else if(lu > ru) dirty.add(k);
+  });
+  Object.keys(state.log).forEach(function(d){ if(!entries["d:"+d] && hasActivity(state.log[d])) dirty.add("d:"+d); });
+  if(!entries.settings && state.settings.u) dirty.add("settings");
+  return changed;
+}
+function setSync(kind, msg){
+  syncState = {kind:kind, msg:msg || ""};
+  const el = document.getElementById("syncstat");
+  if(el){
+    el.textContent = kind === "ok" ? "Synced " + new Date(state.sync.last).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})
+      : kind === "busy" ? "Syncing…" : kind === "err" ? "Not synced, will retry" : "This device only";
+    el.dataset.kind = kind;
+  }
+  const m = document.getElementById("syncmsg"); if(m) m.textContent = syncMessage();
+}
+function syncMessage(){
+  if(!syncOn()) return "Not connected. Entries stay in this browser only.";
+  if(syncState.kind === "err") return syncState.msg;
+  if(syncState.kind === "busy") return "Syncing…";
+  return state.sync.last ? "Connected. Last synced " + new Date(state.sync.last).toLocaleString("en-GB",{weekday:"short",hour:"2-digit",minute:"2-digit"}) + "." : "Connected.";
+}
+async function callScript(body){
+  const url = state.sync.url;
+  const res = body
+    ? await fetch(url, {method:"POST", body:JSON.stringify(body), keepalive: !!body.beacon})
+    : await fetch(url + (url.indexOf("?") < 0 ? "?" : "&") + "key=" + encodeURIComponent(state.sync.key) + "&t=" + Date.now());
+  if(!res.ok) throw new Error("The sync script answered with an error (" + res.status + "). Check the web app URL.");
+  let data; try { data = await res.json(); } catch(e){ throw new Error("The URL didn’t return sync data. Use the web app URL that ends in /exec."); }
+  if(!data.ok) throw new Error(data.error === "bad key" ? "The sync key doesn’t match the one in your Apps Script." : "Sync failed: " + (data.error || "unknown error") + ".");
+  return data;
+}
+function applyRemoteChange(){
+  const wd = state.settings.wedding;
+  PLAN = buildPlan(); if(wd) sel = clampIdx(sel);
+  save();
+  const a = document.activeElement;
+  if(a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA") && document.getElementById("view").contains(a)) { pendingRender = true; renderCal(); }
+  else render();
+}
+async function syncNow(){
+  if(!syncOn() || syncing) return;
+  syncing = true; setSync("busy");
+  try{
+    let data = await callScript(null);
+    let changed = mergeRemote(data.entries || {});
+    if(dirty.size){
+      const entries = {}, sentU = {};
+      dirty.forEach(function(k){ const e = entryFor(k); if(e){ entries[k] = e; sentU[k] = e.u; } });
+      data = await callScript({key:state.sync.key, entries:entries});
+      Object.keys(sentU).forEach(function(k){ const e = entryFor(k); if(e && e.u === sentU[k]) dirty.delete(k); });
+      if(mergeRemote(data.entries || {})) changed = true;
+    }
+    state.sync.last = Date.now(); save();
+    if(changed) applyRemoteChange();
+    setSync("ok");
+  } catch(err){
+    setSync("err", (err && err.message && err.message.indexOf("fetch") < 0) ? err.message : "Couldn’t reach the sync script. You may be offline; changes are kept here and will sync later.");
+    clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 30000);
+  } finally { syncing = false; }
+  if(dirty.size && syncState.kind === "ok") scheduleSync(800);
+}
+function flushOnLeave(){
+  if(!syncOn() || !dirty.size) return;
+  const entries = {}; dirty.forEach(function(k){ const e = entryFor(k); if(e) entries[k] = e; });
+  try { fetch(state.sync.url, {method:"POST", body:JSON.stringify({key:state.sync.key, entries:entries}), keepalive:true}); } catch(e){}
+}
+document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") syncNow(); else flushOnLeave(); });
+window.addEventListener("pagehide", flushOnLeave);
+document.addEventListener("focusout", function(){ if(pendingRender) setTimeout(function(){ const a = document.activeElement; if(!(a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"))){ pendingRender = false; render(); } }, 50); });
+setInterval(function(){ if(document.visibilityState === "visible") syncNow(); }, 60000);
+
 /* ---------- Events ---------- */
 document.addEventListener("click", function(e){
   const b = e.target.closest("[data-act]"); if(!b) return;
@@ -1002,48 +1107,63 @@ document.addEventListener("click", function(e){
   if(act === "sel"){ sel = +b.dataset.i; tab = "day"; render(); document.querySelector(".tabs").scrollIntoView({behavior:"smooth", block:"start"}); }
   else if(act === "tab"){ tab = b.dataset.t; render(); }
   else if(act === "nav"){ sel = clampIdx(sel + (+b.dataset.d)); render(); }
-  else if(act === "mode"){ state.settings.mode = b.dataset.v; save(); render(); }
+  else if(act === "mode"){ state.settings.mode = b.dataset.v; touchSettings(); save(); render(); }
   else if(act === "tick"){
     const l = getLog(PLAN[sel].iso), arr = l.sets[b.dataset.ex] || (l.sets[b.dataset.ex] = []), k = +b.dataset.k;
     arr[k] = arr[k] || {}; arr[k].ok = !arr[k].ok;
-    b.setAttribute("aria-pressed", String(arr[k].ok)); save(); renderCal();
+    b.setAttribute("aria-pressed", String(arr[k].ok)); touchDay(PLAN[sel].iso); save(); renderCal();
   }
   else if(act === "energy"){
-    const l = getLog(PLAN[sel].iso), v = +b.dataset.v; l.energy = l.energy === v ? 0 : v; save(); renderDay(); renderCal();
+    const l = getLog(PLAN[sel].iso), v = +b.dataset.v; l.energy = l.energy === v ? 0 : v; touchDay(PLAN[sel].iso); save(); renderDay(); renderCal();
   }
   else if(act === "done"){
-    const l = getLog(PLAN[sel].iso); l.done = !l.done; save(); render();
+    const l = getLog(PLAN[sel].iso); l.done = !l.done; touchDay(PLAN[sel].iso); save(); render();
     if(l.done) toast(PLAN[sel].key === "WED" ? "Congratulations!" : "Day " + (sel+1) + " done");
   }
   else if(act === "export"){
-    const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+    const blob = new Blob([JSON.stringify({settings:state.settings, log:state.log}, null, 2)], {type:"application/json"});
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "aisle42-backup-" + iso(new Date()) + ".json";
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
   }
+  else if(act === "sync-connect"){
+    const u = (document.querySelector("[data-sync=url]").value || "").trim(), k = (document.querySelector("[data-sync=key]").value || "").trim();
+    if(!/^https:\/\/script\.google\.com\/.+\/exec$/.test(u)){ setSync("err","Paste the web app URL from Apps Script. It starts with https://script.google.com/ and ends in /exec."); return; }
+    if(k.length < 8){ setSync("err","Use a sync key of at least 8 characters, the same one you put in the script."); return; }
+    state.sync.url = u; state.sync.key = k; save(); syncNow().then(function(){ if(syncState.kind === "ok"){ toast("Sync connected"); render(); } });
+  }
+  else if(act === "sync-now"){ syncNow(); }
+  else if(act === "sync-off"){
+    if(confirm("Disconnect this device? Your entries stay here but stop syncing.")){ state.sync = {url:"", key:"", last:0}; save(); setSync("off"); render(); }
+  }
   else if(act === "reset"){
-    if(confirm("Clear every entry in this browser? Export a backup first if you might want it back.")){ state.log = {}; save(); render(); toast("All entries cleared"); }
+    if(confirm(syncOn() ? "Clear every entry on all your synced devices? Export a backup first if you might want it back." : "Clear every entry in this browser? Export a backup first if you might want it back.")){
+      Object.keys(state.log).forEach(function(d){ state.log[d] = {done:false, sets:{}, checks:{}, steps:"", weight:"", energy:0, note:"", u:Date.now()}; dirty.add("d:"+d); });
+      save(); render(); scheduleSync(0); toast("All entries cleared");
+    }
   }
 });
 document.addEventListener("input", function(e){
   const t = e.target;
   if(t.hasAttribute("data-set")){
     const l = getLog(PLAN[sel].iso), arr = l.sets[t.dataset.ex] || (l.sets[t.dataset.ex] = []), k = +t.dataset.k;
-    arr[k] = arr[k] || {}; arr[k][t.dataset.f] = t.value.trim(); save(); renderCal();
+    arr[k] = arr[k] || {}; arr[k][t.dataset.f] = t.value.trim(); touchDay(PLAN[sel].iso); save(); renderCal();
   } else if(t.dataset.field){
-    const l = getLog(PLAN[sel].iso); l[t.dataset.field] = t.value; save(); renderCal();
+    const l = getLog(PLAN[sel].iso); l[t.dataset.field] = t.value; touchDay(PLAN[sel].iso); save(); renderCal();
   }
 });
 document.addEventListener("change", function(e){
   const t = e.target;
-  if(t.dataset.check){ const l = getLog(PLAN[sel].iso); l.checks[t.dataset.check] = t.checked; save(); renderCal(); }
-  else if(t.dataset.act === "wedding" && t.value){ state.settings.wedding = t.value; PLAN = buildPlan(); sel = clampIdx(todayIndex()); save(); render(); toast("Plan moved to the new date"); }
+  if(t.dataset.check){ const l = getLog(PLAN[sel].iso); l.checks[t.dataset.check] = t.checked; touchDay(PLAN[sel].iso); save(); renderCal(); }
+  else if(t.dataset.act === "wedding" && t.value){ state.settings.wedding = t.value; touchSettings(); PLAN = buildPlan(); sel = clampIdx(todayIndex()); save(); render(); toast("Plan moved to the new date"); }
   else if(t.dataset.act === "import" && t.files && t.files[0]){
     const r = new FileReader();
     r.onload = function(){
       try{
         const data = JSON.parse(r.result);
         if(!data || typeof data.log !== "object") throw new Error("bad");
-        state = {settings:Object.assign({mode:"gym", wedding:"2026-12-06"}, data.settings||{}), log:data.log};
+        const keepSync = state.sync, now = Date.now();
+        state = {settings:Object.assign({mode:"gym", wedding:"2026-12-06"}, data.settings||{}, {u:now}), log:data.log, sync:keepSync};
+        Object.keys(state.log).forEach(function(d){ state.log[d].u = now; dirty.add("d:"+d); }); dirty.add("settings"); scheduleSync(0);
         PLAN = buildPlan(); sel = clampIdx(todayIndex()); save(); render(); toast("Backup imported");
       } catch(err){ toast("That file isn’t a backup from this site"); }
     };
@@ -1052,6 +1172,7 @@ document.addEventListener("change", function(e){
 });
 
 render();
+if(syncOn()) syncNow(); else setSync("off");
 })();
 </script>
 </body>
