@@ -82,8 +82,8 @@ button{cursor:pointer}
 section.block{margin:1.25rem 0}
 section.block>h3{font-size:1.15rem;margin:0 0 .5rem}
 .checks{list-style:none;margin:0;padding:0}
-.checks li{border-bottom:1px solid var(--line)}
-.checks label{display:flex;gap:.7rem;align-items:flex-start;padding:.6rem 0;cursor:pointer}
+.checks>li{border-bottom:1px solid var(--line)}
+.checks>li>label{display:flex;gap:.7rem;align-items:flex-start;padding:.6rem 0;cursor:pointer}
 .checks input{width:1.25rem;height:1.25rem;margin:.15rem 0 0;accent-color:var(--sage);flex:none}
 .checks input:checked+span{color:var(--muted);text-decoration:line-through}
 
@@ -140,6 +140,37 @@ section.block>h3{font-size:1.15rem;margin:0 0 .5rem}
 .note{background:var(--surface);border:1px solid var(--line);border-radius:.6rem;padding:.7rem .9rem;font-size:.92rem;margin:.75rem 0}
 .settings label{display:block;margin:.6rem 0}
 .settings input[type=date]{padding:.45rem .6rem;border:1px solid var(--line);border-radius:.45rem;background:var(--field);font-size:16px}
+/* Exercise demos */
+.howto{margin-top:.55rem;border-top:1px solid var(--line);padding-top:.45rem}
+.howto summary{cursor:pointer;font-weight:700;color:var(--ink);font-size:.92rem;list-style:none;display:flex;align-items:center;gap:.45rem;padding:.2rem 0}
+.howto summary::-webkit-details-marker{display:none}
+.howto summary::before{content:"";width:.55rem;height:.55rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+.howto[open] summary::before{transform:rotate(45deg)}
+.howwrap{display:grid;grid-template-columns:minmax(0,13rem) 1fr;gap:.9rem;align-items:start;margin-top:.5rem}
+@media (max-width:520px){.howwrap{grid-template-columns:1fr}.howwrap .stage{max-width:16rem}}
+.stage{background:var(--field);border:1px solid var(--line);border-radius:.6rem;padding:.25rem}
+.stage svg{display:block;width:100%;height:auto}
+.howwrap ol{margin:0;padding-left:1.2rem}
+.howwrap li{margin:.15rem 0;font-size:.95rem}
+.howwrap .avoid{margin:.5rem 0 0;font-size:.9rem}
+.howwrap .avoid b{color:var(--brass)}
+.howwrap .vid{display:inline-block;margin-top:.4rem;font-size:.85rem;color:var(--muted)}
+.checks .howto{margin:0 0 .6rem 1.95rem;border-top:0;padding-top:0}
+.lib .howto{background:var(--surface);border:1px solid var(--line);border-radius:.6rem;padding:.35rem .8rem;margin:.4rem 0}
+.lib .howto summary{font-family:var(--display);font-size:1.02rem}
+.stage .lb{stroke:var(--ink);stroke-width:7;stroke-linecap:round}
+.stage .far .lb{stroke:var(--muted);stroke-width:6;opacity:.75}
+.stage .tr{stroke:var(--ink);stroke-width:9;stroke-linecap:round;fill:none}
+.stage .hd{fill:var(--field);stroke:var(--ink);stroke-width:4}
+.stage .gr{stroke:var(--line);stroke-width:2}
+.stage .eq{fill:var(--surface);stroke:var(--muted);stroke-width:2}
+.stage .eqs{stroke:var(--muted);stroke-width:3}
+.stage .eqw{stroke:var(--muted);stroke-width:6;stroke-linecap:round}
+.stage .eqb{stroke:var(--muted);stroke-width:4;stroke-linecap:round}
+.stage .eqd{fill:var(--muted)}
+.stage .wt{fill:var(--brass)}
+.stage .cab{stroke:var(--muted);stroke-width:1.5}
+.stage .band{stroke:var(--sage);stroke-width:2.5;stroke-dasharray:4 3}
 .toast{position:fixed;left:50%;bottom:calc(1rem + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.6rem 1rem;border-radius:.6rem;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.show{opacity:1}
 @media (max-width:420px){.cell{min-height:3rem;padding:.25rem}.cell .kind{font-size:.6rem}}
@@ -407,11 +438,10 @@ function exCard(d, lf){
     }
     sets += '<button class="tick" data-act="tick" data-ex="'+lf.ex+'" data-k="'+k+'" aria-pressed="'+(r.ok?"true":"false")+'" aria-label="Set '+(k+1)+' done">✓</button></div>';
   }
-  const q = encodeURIComponent(exName(lf.ex) + " form");
   return '<article class="ex '+lf.kind+'"><h4>'+esc(exName(lf.ex))+'</h4>' +
     '<p class="rx">'+lf.sets+" × "+lf.reps+(lf.kind!=="core" ? ", RPE "+lf.rpe : "")+", rest "+lf.rest+"</p>" +
-    '<p class="cue">'+esc(ex.c)+' <a class="how" href="https://www.youtube.com/results?search_query='+q+'" target="_blank" rel="noopener">Watch the form</a></p>' +
-    lastTxt + '<div class="sets">'+sets+"</div></article>";
+    (state.settings.mode === "home" ? "" : '<p class="cue">'+esc(ex.c)+'</p>') +
+    lastTxt + '<div class="sets">'+sets+"</div>" + howPanel("ex-"+figFor(lf.ex), figFor(lf.ex), null, null, exName(lf.ex)) + "</article>";
 }
 function renderDay(){
   const d = PLAN[sel], log = peekLog(d.iso) || {checks:{}}, ph = PHASES[d.week];
@@ -426,7 +456,9 @@ function renderDay(){
   function checkList(items, offset){
     return '<ul class="checks">' + items.map(function(t, idx){
       const id = "c"+(idx+offset);
-      return '<li><label><input type="checkbox" data-check="'+id+'"'+(log.checks && log.checks[id]?" checked":"")+"><span>"+esc(t)+"</span></label></li>";
+      const dr = drillFor(t);
+      const how = dr ? howPanel("dr-"+dr[0], typeof dr[1] === "string" ? dr[1] : null, typeof dr[1] === "string" ? null : dr[1], null) : "";
+      return '<li><label><input type="checkbox" data-check="'+id+'"'+(log.checks && log.checks[id]?" checked":"")+"><span>"+esc(t)+"</span></label>"+how+"</li>";
     }).join("") + "</ul>";
   }
   if(d.warm){
@@ -544,9 +576,417 @@ function renderGuide(){
   '<h3>Gym or home</h3><p>Use the Gym and Home switch on any training day. The home version of each exercise needs a pair of adjustable dumbbells, a resistance band and a bench or sturdy chair. Your log is shared between versions, so expect different numbers if you switch back and forth.</p>' +
   '<h3>Food and sleep</h3><p>Eat at roughly maintenance so you build strength without changing your suit size. Aim for about 1.6 to 2 g of protein per kg of body weight every day, spread over three or four meals. Sleep is when you recover: 7 to 9 hours, as consistently as you can manage around work.</p>' +
   '<h3>The last week</h3><p>The taper is the most important part of the plan. Last leg session is Monday, last real upper session Tuesday, then a short arm and shoulder pump Thursday. Nothing new, nothing heavy, nothing that leaves you sore for photos or dancing.</p>' +
+  '<h3>Exercise library</h3><p>Every exercise in the plan, shown in the '+(state.settings.mode === "home" ? "home" : "gym")+' version. Switch between gym and home on any training day.</p><div class="lib">' +
+  Object.keys(FIGMAP).filter(function(k, i, all){ return all.findIndex(function(o){ return figFor(o) === figFor(k); }) === i; }).map(function(k){ return howPanel("lib-"+figFor(k), figFor(k), null, exName(k)); }).join("") +
+  ["Plank","Cat–cow","Couch stretch","Thoracic rotations","90/90 hip switches"].map(function(n){ const dr = drillFor(n); return howPanel("lib-"+n, typeof dr[1] === "string" ? dr[1] : null, typeof dr[1] === "string" ? null : dr[1], n); }).join("") +
+  '</div>' +
   '<div class="note">Sharp pain, joint pain, dizziness or chest discomfort means stop the exercise. Swap it for the home version or skip it, and check with a doctor or physio if it doesn’t settle in a couple of days.</div>' +
   "</div>";
 }
+
+/* ---------- Exercise demos: animated stick figures ---------- */
+const FIGLEN = {t:52, th:44, sh:42, ft:12, ua:30, fa:27};
+function fP(p,a,l){ const r = a*Math.PI/180; return [p[0]+l*Math.cos(r), p[1]+l*Math.sin(r)]; }
+function fIK(b, tg, L1, L2, s){
+  const dx = tg[0]-b[0], dy = tg[1]-b[1];
+  let d = Math.hypot(dx,dy); d = Math.min(Math.max(d, Math.abs(L1-L2)+0.5), L1+L2-0.3);
+  const th = Math.atan2(dy,dx), a = Math.acos((L1*L1+d*d-L2*L2)/(2*L1*d));
+  const j = [b[0]+L1*Math.cos(th+s*a), b[1]+L1*Math.sin(th+s*a)];
+  const th2 = Math.atan2(tg[1]-j[1], tg[0]-j[0]);
+  return [j, [j[0]+L2*Math.cos(th2), j[1]+L2*Math.sin(th2)]];
+}
+const POSE0 = {hip:[120,93], t:-90, n:[90,90], f:[90,90], ftN:0, ftF:0, a:[90,90], b:[90,90], al:1, cv:0, front:false};
+function fPose(q){ return Object.assign({}, POSE0, q); }
+function fJoints(q){
+  const J = {};
+  J.hip = q.hip.slice();
+  J.sh = fP(J.hip, q.t, FIGLEN.t);
+  const sw = q.front ? 13 : 0, hw = q.front ? 8 : 0;
+  J.sN = fP(J.sh, q.t+90, sw); J.sF = fP(J.sh, q.t+90, -sw);
+  J.hN = fP(J.hip, q.t+90, hw); J.hF = fP(J.hip, q.t+90, -hw);
+  J.head = fP(J.sh, q.hd != null ? q.hd : q.t, 15);
+  const tl = FIGLEN.th*(q.tl||1), sl = FIGLEN.sh*(q.sl||1);
+  if(!q.ikN){ J.kN = fP(J.hN, q.n[0], tl); J.aN = fP(J.kN, q.n[1], sl); }
+  if(!q.ikF){ J.kF = fP(J.hF, q.f[0], tl); J.aF = fP(J.kF, q.f[1], sl); }
+  const ua = FIGLEN.ua*q.al, fa = FIGLEN.fa*q.al;
+  if(!q.ikA){ J.eN = fP(J.sN, q.a[0], ua); J.wN = fP(J.eN, q.a[1], fa); }
+  if(!q.ikB){ J.eF = fP(J.sF, q.b[0], ua); J.wF = fP(J.eF, q.b[1], fa); }
+  if(q.anc){
+    const src = J[q.anc[0]], dx = q.anc[1]-src[0], dy = q.anc[2]-src[1];
+    Object.keys(J).forEach(function(k){ J[k] = [J[k][0]+dx, J[k][1]+dy]; });
+  }
+  let r;
+  if(q.ikN){ r = fIK(J.hN, q.ikN, FIGLEN.th, FIGLEN.sh, q.kn || -1); J.kN = r[0]; J.aN = r[1]; }
+  if(q.ikF){ r = fIK(J.hF, q.ikF, FIGLEN.th, FIGLEN.sh, q.kf || q.kn || -1); J.kF = r[0]; J.aF = r[1]; }
+  if(q.ikA){ r = fIK(J.sN, q.ikA, FIGLEN.ua, FIGLEN.fa, q.ea || 1); J.eN = r[0]; J.wN = r[1]; }
+  if(q.ikB){ r = fIK(J.sF, q.ikB, FIGLEN.ua, FIGLEN.fa, q.eb || q.ea || 1); J.eF = r[0]; J.wF = r[1]; }
+  J.wM = [(J.wN[0]+J.wF[0])/2, (J.wN[1]+J.wF[1])/2];
+  J.tN = fP(J.aN, q.ftN, FIGLEN.ft); J.tF = fP(J.aF, q.ftF, FIGLEN.ft);
+  J.q = q;
+  return J;
+}
+function fLerp(a, b, u){
+  if(typeof a === "number") return a + (b-a)*u;
+  if(Array.isArray(a)) return a.map(function(v,i){ return fLerp(v, b[i], u); });
+  if(a && typeof a === "object"){ const o = {}; Object.keys(a).forEach(function(k){ o[k] = (k in b) ? fLerp(a[k], b[k], u) : a[k]; }); return o; }
+  return a;
+}
+function fL(p1,p2,cls){ return '<line class="'+cls+'" x1="'+p1[0].toFixed(1)+'" y1="'+p1[1].toFixed(1)+'" x2="'+p2[0].toFixed(1)+'" y2="'+p2[1].toFixed(1)+'"/>'; }
+function fProp(p, J){
+  const k = p.k;
+  if(k === "bench") return '<rect class="eq" x="'+p.x+'" y="'+p.y+'" width="'+p.w+'" height="7" rx="3"/>' + fL([p.x+8,p.y+7],[p.x+8,183],"eqs") + fL([p.x+p.w-8,p.y+7],[p.x+p.w-8,183],"eqs");
+  if(k === "rect") return '<rect class="eq" x="'+p.x+'" y="'+p.y+'" width="'+p.w+'" height="'+p.h+'" rx="2"/>';
+  if(k === "line") return '<line class="eqw" x1="'+p.x1+'" y1="'+p.y1+'" x2="'+p.x2+'" y2="'+p.y2+'"/>';
+  if(k === "wall") return fL([p.x,183],[p.x,p.y || 60],"eqs");
+  if(k === "bar") return '<circle class="eqd" cx="'+p.x+'" cy="'+p.y+'" r="5"/>' + (p.up ? fL([p.x,p.y],[p.x,0],"eqs") : "");
+  if(k === "plate"){ const c = J[p.j]; return '<circle class="wt" cx="'+(c[0]+(p.dx||0)).toFixed(1)+'" cy="'+(c[1]+(p.dy||0)).toFixed(1)+'" r="'+p.r+'"/>'; }
+  if(k === "db"){ const c = J[p.j]; return '<circle class="wt" cx="'+c[0].toFixed(1)+'" cy="'+c[1].toFixed(1)+'" r="6"/>'; }
+  if(k === "dbv"){ const c = J[p.j]; return '<rect class="wt" x="'+(c[0]-4).toFixed(1)+'" y="'+(c[1]-10).toFixed(1)+'" width="9" height="20" rx="3"/>'; }
+  if(k === "wheel"){ const c = J[p.j]; return '<circle class="wt" cx="'+c[0].toFixed(1)+'" cy="'+(c[1]+3).toFixed(1)+'" r="8"/>'; }
+  if(k === "cable"){ const c = J[p.j]; return fL([p.x,p.y], c, p.band ? "band" : "cab") + (p.band ? "" : '<circle class="eqd" cx="'+p.x+'" cy="'+p.y+'" r="4"/>'); }
+  if(k === "hbar") return fL([p.x1,p.y],[p.x2,p.y],"eqb");
+  if(k === "barJ"){ const a = J.wF, b = J.wN, dx = (b[0]-a[0])*0.18, dy = (b[1]-a[1])*0.18; return fL([a[0]-dx,a[1]-dy],[b[0]+dx,b[1]+dy],"eqb"); }
+  if(k === "bandJ") return fL(J[p.j1], J[p.j2], "band");
+  if(k === "padJ"){ const c = J[p.j]; return '<rect class="eq" x="'+(c[0]+p.dx).toFixed(1)+'" y="'+(c[1]+p.dy).toFixed(1)+'" width="'+p.w+'" height="'+p.h+'" rx="3"/>'; }
+  if(k === "plat"){ const a = J.aN, ang = J.q.ftN, n = ang + (p.side || 90); const s = fP(fP(a, ang+180, 7), n, 6), e = fP(fP(a, ang, 22), n, 6); return fL(s, e, "eqw"); }
+  return "";
+}
+function fDraw(fig, J){
+  const q = J.q;
+  let back = "", front = "";
+  (fig.props || []).forEach(function(p){ if(p.z === "f") front += fProp(p, J); else back += fProp(p, J); });
+  let s = "";
+  if(fig.ground !== false) s += fL([0,183],[240,183],"gr");
+  s += back;
+  s += '<g class="far">' + fL(J.hF,J.kF,"lb") + fL(J.kF,J.aF,"lb") + fL(J.aF,J.tF,"lb") + fL(J.sF,J.eF,"lb") + fL(J.eF,J.wF,"lb") + "</g>";
+  if(q.front) s += fL(J.hF,J.hN,"tr") + fL(J.sF,J.sN,"tr");
+  const mid = [(J.hip[0]+J.sh[0])/2, (J.hip[1]+J.sh[1])/2], c = fP(mid, q.t-90, q.cv);
+  s += '<path class="tr" d="M'+J.hip[0].toFixed(1)+" "+J.hip[1].toFixed(1)+" Q"+c[0].toFixed(1)+" "+c[1].toFixed(1)+" "+J.sh[0].toFixed(1)+" "+J.sh[1].toFixed(1)+'"/>';
+  s += '<circle class="hd" cx="'+J.head[0].toFixed(1)+'" cy="'+J.head[1].toFixed(1)+'" r="9"/>';
+  s += '<g class="near">' + fL(J.hN,J.kN,"lb") + fL(J.kN,J.aN,"lb") + fL(J.aN,J.tN,"lb") + fL(J.sN,J.eN,"lb") + fL(J.eN,J.wN,"lb") + "</g>";
+  s += front;
+  return s;
+}
+function fEase(u){ return u<.5 ? 2*u*u : 1-Math.pow(-2*u+2,2)/2; }
+function fPhase(ms, fig){
+  const T = fig.ms || 3200, u = (ms % T)/T;
+  if(fig.loop) return fEase(u < .5 ? u*2 : 2-u*2);
+  if(u < .1) return 0; if(u < .45) return fEase((u-.1)/.35);
+  if(u < .6) return 1; if(u < .92) return 1 - fEase((u-.6)/.32); return 0;
+}
+function fFrame(fig, u){ return fDraw(fig, fJoints(fLerp(fPose(fig.A), fPose(fig.B), u))); }
+function fStatic(fig){ // reduced motion: start pose faded, end pose solid
+  return '<g opacity=".3">'+fFrame(fig,0)+"</g>"+fFrame(fig,1);
+}
+
+const STAND = {hip:[115,93], t:-88};
+const FIG = {
+  squat:{A:{hip:[112,93],t:-86,ikN:[118,178],ikF:[114,178],a:[125,-68],b:[122,-70]},
+         B:{hip:[90,140],t:-50,ikN:[118,178],ikF:[114,178],a:[158,-32],b:[155,-35]},
+         props:[{k:"plate",j:"wN",r:15,dx:-4,z:"f"}],
+         steps:["Bar across your upper back, not your neck. Feet shoulder-width, toes turned out slightly.","Big breath into your belly and brace like you’re about to be poked in the stomach.","Sit down between your heels until your thighs are about parallel, knees tracking over your toes.","Drive up through your whole foot, chest and hips rising together."],
+         avoid:"Knees caving in, heels lifting, or rounding your lower back at the bottom."},
+  goblet:{A:{hip:[112,93],t:-88,ikN:[118,178],ikF:[114,178],a:[98,-48],b:[96,-50]},
+          B:{hip:[92,138],t:-62,ikN:[118,178],ikF:[114,178],a:[118,-30],b:[116,-32]},
+          props:[{k:"dbv",j:"wN",z:"f"}],
+          steps:["Hold one dumbbell vertically against your chest, elbows pointing down.","Feet a bit wider than your hips, toes slightly out.","Sit straight down so your elbows pass inside your knees, chest staying tall.","Stand up by pushing the floor away."],
+          avoid:"Letting the dumbbell drift away from your chest, which pulls you forward."},
+  bss:{A:{hip:[116,96],t:-84,ikN:[142,178],ikF:[60,127],kf:-1,ftF:205,a:[92,92],b:[88,88]},
+       B:{hip:[102,133],t:-76,ikN:[142,178],ikF:[60,127],kf:-1,ftF:205,a:[92,92],b:[88,88]},
+       props:[{k:"bench",x:18,y:132,w:58},{k:"db",j:"wN",z:"f"}],
+       steps:["Stand about a big stride in front of a bench and rest the top of your back foot on it.","Hold the dumbbells at your sides, torso leaning forward a little.","Drop your back knee straight down toward the floor until your front thigh is about parallel.","Push through your front heel to come back up. Finish all reps, then switch legs."],
+       avoid:"Pushing off the back foot. It’s just for balance; the front leg does the work."},
+  legcurl:{A:{hip:[108,128],t:0,n:[180,180],f:[181,181],ftN:90,ftF:90,a:[100,70],b:[98,72]},
+           B:{hip:[108,128],t:0,n:[180,285],f:[181,286],ftN:15,ftF:15,a:[100,70],b:[98,72]},
+           props:[{k:"rect",x:40,y:134,w:150,h:8},{k:"rect",x:110,y:142,w:8,h:41},{k:"padJ",j:"aN",dx:-5,dy:-12,w:10,h:9,z:"f"}],
+           steps:["Lie face down with the pad just above your heels and your knees just off the edge of the bench.","Hold the handles and press your hips into the pad.","Curl your heels toward your glutes.","Lower slowly, taking about three seconds."],
+           avoid:"Hips lifting off the pad as you curl. That means the weight is too heavy."},
+  slidercurl:{A:{hip:[110,160],t:166,ikN:[172,176],ikF:[170,176],ftN:-70,ftF:-70,a:[-8,0],b:[-6,0]},
+              B:{hip:[104,140],t:150,ikN:[136,176],ikF:[134,176],ftN:-70,ftF:-70,a:[-25,-10],b:[-23,-10]},
+              props:[{k:"padJ",j:"aN",dx:-8,dy:3,w:16,h:3,z:"f"}],
+              steps:["Lie on your back with your heels on towels (on a smooth floor) or sliders.","Lift your hips into a bridge and keep them up the whole set.","Pull your heels toward your glutes, then slide them back out until your legs are almost straight.","Keep the outward slide slow. That’s the hard part."],
+           avoid:"Letting your hips drop as you slide out."},
+  calf:{A:{hip:[110,88],t:-90,ikN:[112,172],ikF:[110,172],ftN:-25,ftF:-25,a:[92,92],b:[88,88]},
+        B:{hip:[116,72],t:-90,ikN:[118,156],ikF:[116,156],ftN:65,ftF:65,a:[92,92],b:[88,88]},
+        vb:"0 -15 240 205",
+        props:[{k:"rect",x:120,y:168,w:40,h:15},{k:"db",j:"wN",z:"f"}],
+        steps:["Stand with the balls of your feet on the edge of a step or plate, heels hanging off.","Let your heels sink as low as they’ll go for a full stretch.","Rise up as high as you can onto your toes and pause for one second.","Lower slowly."],
+        avoid:"Bouncing at the bottom. Pause in the stretch instead."},
+  calf1:{A:{hip:[110,88],t:-90,ikN:[112,172],ftN:-25,f:[110,170],ftF:150,a:[92,92],b:[60,40]},
+         B:{hip:[116,72],t:-90,ikN:[118,156],ftN:65,f:[110,170],ftF:150,a:[92,92],b:[60,40]},
+         vb:"0 -15 240 205",
+         props:[{k:"rect",x:120,y:168,w:40,h:15},{k:"wall",x:175,y:70},{k:"db",j:"wN",z:"f"}],
+         steps:["Stand on one foot with the ball of the foot on a step, heel hanging off. Hold a wall for balance.","Hook your other foot behind your working ankle.","Drop the heel for a deep stretch, then rise as high as possible and pause.","Do all reps, then switch sides."],
+         avoid:"Rushing. Slow reps on one leg are plenty hard."},
+  deadbug:{A:{hip:[132,170],t:180,n:[-90,0],f:[-88,2],ftN:-60,ftF:-60,a:[-90,-90],b:[-88,-88]},
+           B:{hip:[132,170],t:180,n:[-90,0],f:[-12,-10],ftN:-60,ftF:-60,a:[-170,-172],b:[-88,-88]},
+           steps:["Lie on your back, arms pointing at the ceiling, knees bent at 90° above your hips.","Press your lower back firmly into the floor.","Slowly reach one arm overhead while the opposite leg straightens toward the floor.","Return and switch sides. Breathe out as you reach."],
+           avoid:"Your lower back arching off the floor. Shorten the reach if it does."},
+  sideplank:{A:{hip:[124,168],t:203,ikN:[208,178],ikF:[206,175],a:[90,180],b:[-90,-90],ftN:90,ftF:90},
+             B:{hip:[124,158],t:193,ikN:[208,178],ikF:[206,175],a:[90,180],b:[-90,-90],ftN:90,ftF:90},
+             ms:4200,
+             steps:["Lie on your side with your elbow directly under your shoulder and your feet stacked.","Lift your hips until your body is a straight line from head to heels.","Push the floor away with your forearm and keep breathing.","Hold for the time, then switch sides."],
+             avoid:"Hips sagging toward the floor or piking backward."},
+  rdl:{A:{hip:[110,92],t:-88,ikN:[114,178],ikF:[112,178],a:[90,90],b:[89,89]},
+       B:{hip:[88,98],t:-14,ikN:[114,178],ikF:[112,178],a:[90,90],b:[89,89]},
+       props:[{k:"plate",j:"wN",r:14,z:"f"}],
+       steps:["Stand tall holding the bar at your thighs, feet hip-width, knees softly bent.","Push your hips back like you’re closing a car door with your butt.","Let the bar slide down your thighs until you feel a strong hamstring stretch, usually just below the knees.","Squeeze your glutes to stand back up."],
+       avoid:"Rounding your back or turning it into a squat by bending the knees more."},
+  dbrdl:{A:{hip:[110,92],t:-88,ikN:[114,178],ikF:[112,178],a:[90,90],b:[89,89]},
+         B:{hip:[88,98],t:-14,ikN:[114,178],ikF:[112,178],a:[90,90],b:[89,89]},
+         props:[{k:"db",j:"wN",z:"f"}],
+         steps:["Stand tall with a dumbbell in each hand in front of your thighs, knees softly bent.","Push your hips back and let the dumbbells slide down the front of your legs.","Stop when you feel a strong hamstring stretch.","Squeeze your glutes to stand back up."],
+         avoid:"Rounding your back or letting the dumbbells drift away from your legs."},
+  legpress:{A:{hip:[80,142],t:-135,ikN:[138,84],ikF:[136,82],ftN:-135,ftF:-135,a:[60,10],b:[58,12]},
+            B:{hip:[80,142],t:-135,ikN:[114,108],ikF:[112,106],ftN:-135,ftF:-135,a:[60,10],b:[58,12]},
+            props:[{k:"line",x1:92,y1:152,x2:38,y2:98},{k:"line",x1:70,y1:152,x2:110,y2:152},{k:"plat",j:"aN",side:-90,z:"f"}],
+            steps:["Sit with your back and hips flat against the pad, feet shoulder-width in the middle of the platform.","Release the safeties and lower the platform until your knees come toward your chest.","Stop before your lower back starts to curl off the pad.","Press back up without locking your knees hard at the top."],
+            avoid:"Hips rolling up off the seat at the bottom."},
+  stepup:{A:{hip:[108,108],t:-80,ikN:[140,145],ikF:[100,178],a:[92,92],b:[88,88]},
+          B:{hip:[136,62],t:-88,ikN:[140,145],ikF:[122,148],a:[92,92],b:[88,88]},
+          vb:"0 -30 240 220",
+          props:[{k:"rect",x:120,y:150,w:50,h:33},{k:"db",j:"wN",z:"f"}],
+          steps:["Put your whole foot on a sturdy box or bench at about knee height.","Lean forward slightly and drive through that heel to stand up on the box.","Barely touch the floor with your back foot as you step down slowly.","Do all reps on one leg, then switch."],
+          avoid:"Pushing off the bottom foot. The leg on the box should do the work."},
+  hipthrust:{A:{hip:[100,166],t:228,ikN:[150,178],ikF:[148,178],kn:-1,a:[50,30],b:[48,32]},
+             B:{hip:[118,130],t:180,ikN:[150,178],ikF:[148,178],kn:-1,a:[2,5],b:[0,6]},
+             props:[{k:"bench",x:18,y:132,w:56},{k:"plate",j:"hip",r:14,dy:-14,z:"f"}],
+             steps:["Sit on the floor with your upper back against a bench and the bar over your hips (use a pad).","Plant your feet so your shins are vertical at the top.","Drive through your heels to lift your hips until your body is flat from shoulders to knees.","Squeeze your glutes for a second, then lower."],
+             avoid:"Arching your lower back at the top. Keep your chin tucked and ribs down."},
+  slhipthrust:{A:{hip:[100,166],t:228,ikN:[150,178],f:[-20,-20],ftF:-70,a:[50,30],b:[48,32]},
+               B:{hip:[118,130],t:180,ikN:[150,178],f:[-25,-25],ftF:-70,a:[2,5],b:[0,6]},
+               props:[{k:"bench",x:18,y:132,w:56}],
+               steps:["Upper back against a bench or sofa, one foot planted, the other leg held straight up.","Drive through the planted heel and lift your hips until they’re level.","Squeeze your glute for a second at the top.","Lower with control. All reps on one side, then switch."],
+               avoid:"Letting the hip on the lifted-leg side drop."},
+  lunge:{A:{hip:[120,98],t:-88,ikN:[152,178],ikF:[92,170],ftF:35,a:[92,92],b:[88,88]},
+         B:{hip:[118,136],t:-86,ikN:[152,178],ikF:[88,172],ftF:20,a:[92,92],b:[88,88]},
+         props:[{k:"db",j:"wN",z:"f"}],
+         steps:["Stand tall with dumbbells at your sides and take a long step forward.","Lower until your back knee almost touches the floor.","Push through your front heel and bring the back foot forward into the next step.","Keep your torso upright the whole time."],
+         avoid:"Short steps that push your front knee far past your toes."},
+  pallof:{A:{hip:[118,95],t:-90,ikN:[124,178],ikF:[112,178],a:[100,-20],b:[98,-22]},
+          B:{hip:[118,95],t:-90,ikN:[124,178],ikF:[112,178],a:[1,1],b:[0,0]},
+          props:[{k:"cable",x:30,y:102,j:"wN"}],
+          steps:["Stand side-on to the cable or band anchor at chest height, holding the handle at your chest with both hands.","Step away until there’s tension and set your feet about shoulder-width apart.","Press your hands straight out in front of you. The cable tries to twist you; don’t let it.","Hold for two seconds, bring your hands back, repeat. Then face the other way."],
+          avoid:"Rotating toward the anchor. Lighter is better if you can’t stay square."},
+  kneeraise:{A:{hip:[120,128],t:-90,ikA:[122,22],ikB:[118,22],n:[92,90],f:[90,90],ftN:30,ftF:30},
+             B:{hip:[122,126],t:-96,ikA:[122,22],ikB:[118,22],n:[-15,80],f:[-12,82],ftN:30,ftF:30},
+             vb:"0 0 240 230", ground:false, props:[{k:"bar",x:120,y:20,z:"f"}],
+             steps:["Hang from a pull-up bar with straight arms, shoulders pulled slightly down.","Curl your knees up toward your chest by tilting your pelvis up.","Lower slowly until your legs are straight again.","Stay still between reps; no swinging."],
+             avoid:"Swinging your legs to build momentum."},
+  revcrunch:{A:{hip:[130,172],t:180,n:[-95,-5],f:[-93,-3],ftN:-30,ftF:-30,a:[2,0],b:[0,0]},
+             B:{hip:[128,162],t:172,n:[-140,-50],f:[-138,-48],ftN:-80,ftF:-80,a:[0,0],b:[-2,0]},
+             steps:["Lie on your back with your arms by your sides, knees bent and lifted over your hips.","Use your lower abs to curl your hips off the floor, bringing your knees toward your chest.","Lower your hips slowly back down.","Keep your upper back and head relaxed on the floor."],
+             avoid:"Throwing your legs back for momentum."},
+  bench:{A:{hip:[118,132],t:180,ikN:[150,178],ikF:[148,178],a:[-90,-90],b:[-88,-88]},
+         B:{hip:[118,132],t:180,ikN:[150,178],ikF:[148,178],a:[52,-95],b:[54,-93]},
+         props:[{k:"bench",x:40,y:139,w:100},{k:"plate",j:"wN",r:15,z:"f"}],
+         steps:["Lie on the bench with your eyes under the bar and your feet flat on the floor.","Squeeze your shoulder blades together and down, keeping a small arch in your upper back.","Lower the bar to your lower chest with your elbows about 45° from your body.","Press up and slightly back toward your face."],
+         avoid:"Elbows flared straight out to the sides, or bouncing the bar off your chest."},
+  floorpress:{A:{hip:[125,172],t:180,ikN:[156,178],ikF:[154,178],kn:-1,a:[-90,-90],b:[-88,-88]},
+              B:{hip:[125,172],t:180,ikN:[156,178],ikF:[154,178],kn:-1,a:[5,-90],b:[7,-88]},
+              props:[{k:"db",j:"wN",z:"f"}],
+              steps:["Lie on your back with your knees bent and a dumbbell in each hand above your chest.","Lower the dumbbells until your upper arms touch the floor, elbows about 45° from your body.","Pause for a second with your arms resting on the floor.","Press back up until your arms are straight."],
+              avoid:"Dropping onto the floor. Touch it gently and pause."},
+  csrow:{A:{hip:[86,140],t:-40,ikN:[52,178],ikF:[50,178],kn:1,a:[92,92],b:[90,90]},
+         B:{hip:[86,140],t:-40,ikN:[52,178],ikF:[50,178],kn:1,a:[200,95],b:[198,95]},
+         props:[{k:"line",x1:82,y1:156,x2:140,y2:108},{k:"line",x1:100,y1:146,x2:100,y2:183},{k:"db",j:"wN",z:"f"}],
+         steps:["Set an incline bench to about 30–45° and lie face down with your chest on the pad.","Let the dumbbells hang straight down, arms long.","Pull your elbows back toward your hips and squeeze your shoulder blades together.","Pause at the top, then lower slowly."],
+         avoid:"Lifting your chest off the pad to heave the weight."},
+  onearmrow:{A:{hip:[82,106],t:-8,ikN:[76,178],ikF:[98,178],ikB:[150,138],a:[90,90]},
+             B:{hip:[82,106],t:-8,ikN:[76,178],ikF:[98,178],ikB:[150,138],a:[196,94]},
+             props:[{k:"bench",x:120,y:139,w:80},{k:"db",j:"wN",z:"f"}],
+             steps:["Put one hand on a bench, feet wide, back flat and roughly parallel to the floor.","Let the dumbbell hang straight down from your shoulder.","Pull your elbow up and back toward your hip, as if starting a lawnmower slowly.","Lower all the way down for a stretch. All reps on one side, then switch."],
+             avoid:"Twisting your torso open to lift the weight."},
+  ohpseat:{A:{front:true,hip:[120,118],t:-90,n:[60,90],f:[120,90],tl:.45,ftN:10,ftF:170,a:[15,-88],b:[165,-92]},
+           B:{front:true,hip:[120,118],t:-90,n:[60,90],f:[120,90],tl:.45,ftN:10,ftF:170,a:[-75,-87],b:[255,-93]},
+           vb:"0 -15 240 205",
+           props:[{k:"rect",x:102,y:46,w:36,h:72},{k:"rect",x:96,y:120,w:48,h:6},{k:"line",x1:120,y1:126,x2:120,y2:183},{k:"db",j:"wN",z:"f"},{k:"db",j:"wF",z:"f"}],
+           steps:["Sit with your back against an upright bench and the dumbbells at shoulder height, palms facing forward.","Brace your stomach so your lower back doesn’t arch away from the pad.","Press the dumbbells up until your arms are straight overhead.","Lower them back to shoulder height under control."],
+           avoid:"Leaning back and turning it into an incline press."},
+  ohpstand:{A:{front:true,hip:[120,92],t:-90,ikN:[128,178],ikF:[112,178],ftN:10,ftF:170,a:[15,-88],b:[165,-92]},
+            B:{front:true,hip:[120,92],t:-90,ikN:[128,178],ikF:[112,178],ftN:10,ftF:170,a:[-75,-87],b:[255,-93]},
+            vb:"0 -30 240 220",
+            props:[{k:"db",j:"wN",z:"f"},{k:"db",j:"wF",z:"f"}],
+            steps:["Stand with feet hip-width, dumbbells at shoulder height.","Squeeze your glutes and brace your stomach.","Press straight up until your arms are locked out, biceps near your ears.","Lower back to your shoulders slowly."],
+            avoid:"Leaning back to get the weight up."},
+  pulldown:{A:{front:true,hip:[120,118],t:-90,n:[60,90],f:[120,90],tl:.45,ftN:10,ftF:170,a:[-62,-62],b:[242,242]},
+            B:{front:true,hip:[120,118],t:-90,n:[60,90],f:[120,90],tl:.45,ftN:10,ftF:170,a:[48,-92],b:[132,272]},
+            vb:"0 -15 240 205",
+            props:[{k:"rect",x:96,y:120,w:48,h:6},{k:"line",x1:120,y1:126,x2:120,y2:183},{k:"cable",x:120,y:-15,j:"wM"},{k:"barJ",z:"f"},{k:"padJ",j:"kN",dx:-42,dy:-12,w:48,h:8,z:"f"}],
+            steps:["Sit with your thighs tucked under the pad and grip the bar a little wider than your shoulders.","Lean back slightly and lift your chest.","Pull the bar down to your upper chest by driving your elbows down toward your ribs.","Let the bar rise slowly until your arms are straight."],
+            avoid:"Swinging your whole body back to move the weight."},
+  bandpulldown:{A:{front:true,hip:[120,134],t:-90,n:[90,90],f:[90,90],sl:.12,ftN:10,ftF:170,a:[-62,-62],b:[242,242]},
+                B:{front:true,hip:[120,134],t:-90,n:[90,90],f:[90,90],sl:.12,ftN:10,ftF:170,a:[48,-92],b:[132,272]},
+                vb:"0 -15 240 205",
+                props:[{k:"cable",x:120,y:-15,j:"wM",band:true},{k:"barJ",z:"f"}],
+                steps:["Anchor a band high, over the top of a door or a sturdy bar, and kneel facing it.","Hold the band with straight arms overhead and a little tension.","Pull your elbows down toward your ribs, chest up.","Let your arms go back up slowly."],
+                avoid:"Shrugging your shoulders up toward your ears."},
+  ezcurl:{A:{hip:[115,93],t:-90,ikN:[118,178],ikF:[112,178],a:[90,85],b:[89,84]},
+          B:{hip:[115,93],t:-90,ikN:[118,178],ikF:[112,178],a:[92,-68],b:[91,-69]},
+          props:[{k:"plate",j:"wN",r:9,z:"f"}],
+          steps:["Stand tall holding the bar with an underhand grip, elbows at your sides.","Curl the bar up toward your shoulders without moving your elbows forward.","Squeeze at the top.","Lower over two to three seconds until your arms are straight."],
+          avoid:"Swinging the weight up with your hips and lower back."},
+  dbcurl:{A:{hip:[115,93],t:-90,ikN:[118,178],ikF:[112,178],a:[90,85],b:[89,84]},
+          B:{hip:[115,93],t:-90,ikN:[118,178],ikF:[112,178],a:[92,-68],b:[91,-69]},
+          props:[{k:"db",j:"wN",z:"f"}],
+          steps:["Stand tall with a dumbbell in each hand, palms facing forward, elbows at your sides.","Curl both dumbbells up without your elbows drifting forward.","Squeeze at the top.","Lower slowly, taking about three seconds."],
+          avoid:"Using your back to swing the weight up."},
+  hammer:{A:{hip:[115,93],t:-90,ikN:[118,178],ikF:[112,178],a:[90,85],b:[89,84]},
+          B:{hip:[115,93],t:-90,ikN:[118,178],ikF:[112,178],a:[92,-68],b:[91,-69]},
+          props:[{k:"dbv",j:"wN",z:"f"}],
+          steps:["Hold the dumbbells at your sides with palms facing each other, thumbs up.","Curl them up, keeping your thumbs pointing up the whole way.","Pause near your shoulders.","Lower slowly."],
+          avoid:"Elbows swinging forward. Keep them pinned to your sides."},
+  pushdown:{A:{hip:[113,93],t:-84,ikN:[118,178],ikF:[110,178],a:[96,-55],b:[95,-56]},
+            B:{hip:[113,93],t:-84,ikN:[118,178],ikF:[110,178],a:[96,95],b:[95,94]},
+            props:[{k:"cable",x:146,y:2,j:"wN"}],
+            steps:["Face a high cable with a rope attached and grip the ends.","Pin your elbows to your sides with your forearms about parallel to the floor.","Push the rope down until your arms are straight, spreading the ends apart at the bottom.","Let your forearms come back up slowly, elbows staying still."],
+            avoid:"Elbows drifting forward and up as the rope rises."},
+  dbohtri:{A:{hip:[115,93],t:-90,ikN:[120,178],ikF:[110,178],a:[-100,110],b:[-99,111]},
+           B:{hip:[115,93],t:-90,ikN:[120,178],ikF:[110,178],a:[-100,270],b:[-99,271]},
+           vb:"0 -25 240 215",
+           props:[{k:"dbv",j:"wN",z:"f"}],
+           steps:["Hold one dumbbell overhead with both hands cupping the top end.","Keep your elbows pointing forward and close to your head.","Lower the dumbbell behind your head for a deep stretch.","Straighten your arms back up."],
+           avoid:"Elbows flaring wide or your lower back arching."},
+  cableohtri:{A:{hip:[118,95],t:-75,ikN:[150,178],ikF:[96,176],ftF:20,a:[-80,125],b:[-79,126]},
+              B:{hip:[118,95],t:-75,ikN:[150,178],ikF:[96,176],ftF:20,a:[-80,285],b:[-79,286]},
+              vb:"0 -20 240 210",
+              props:[{k:"cable",x:22,y:150,j:"wN"}],
+              steps:["Attach a rope to a low cable, face away from it and bring the rope over your head.","Stagger your stance and lean slightly forward, elbows pointing forward beside your head.","Straighten your arms forward and up.","Let the rope pull your hands back behind your head slowly for a deep stretch."],
+              avoid:"Moving your elbows. Only your forearms should move."},
+  abwheel:{A:{anc:["kN",86,175],hip:[0,0],t:-18,n:[95,180],f:[96,181],ftN:170,ftF:170,ikA:[140,172],ikB:[138,172]},
+           B:{anc:["kN",86,175],hip:[0,0],t:-8,n:[140,180],f:[141,181],ftN:170,ftF:170,ikA:[208,172],ikB:[206,172]},
+           props:[{k:"wheel",j:"wN",z:"f"}],
+           steps:["Kneel on a mat holding the wheel under your shoulders.","Squeeze your glutes and tuck your pelvis slightly, so your back is flat.","Roll forward slowly as far as you can without your lower back sagging.","Pull the wheel back with your abs, not your hips."],
+           avoid:"Lower back dipping toward the floor. Shorten the range until you’re stronger."},
+  plankreach:{A:{hip:[110,153],t:-8,n:[165,165],f:[166,166],ftN:80,ftF:80,a:[90,0],b:[90,0]},
+              B:{hip:[110,153],t:-8,n:[165,165],f:[166,166],ftN:80,ftF:80,a:[-5,-5],b:[90,0]},
+              steps:["Set up in a forearm plank with your elbows under your shoulders and your body in a straight line.","Brace your stomach and squeeze your glutes.","Reach one arm straight out in front of you without letting your hips twist.","Bring it back and switch arms."],
+              avoid:"Hips rocking side to side as you reach."},
+  incline:{A:{hip:[126,140],t:210,ikN:[166,178],ikF:[164,178],ikA:[66,112],ikB:[64,112],ea:-1},
+           B:{hip:[126,140],t:210,ikN:[166,178],ikF:[164,178],ikA:[86,58],ikB:[84,58],ea:-1},
+           props:[{k:"line",x1:124,y1:150,x2:66,y2:117},{k:"line",x1:110,y1:150,x2:140,y2:150},{k:"line",x1:122,y1:150,x2:122,y2:183},{k:"db",j:"wN",z:"f"}],
+           steps:["Set the bench to about 30° and sit back with a dumbbell on each thigh.","Lie back and bring the dumbbells to the sides of your upper chest.","Press them up over your upper chest until your arms are straight.","Lower slowly, elbows about 45° from your body."],
+           avoid:"Setting the bench too steep, which turns it into a shoulder press."},
+  fepushup:{A:{hip:[129.6,129.4],t:-10.4,n:[169.6,169.6],f:[170,170],ftN:90,ftF:90,ikA:[182,176],ikB:[180,176],ea:1},
+            B:{hip:[130.5,154.3],t:6.3,n:[186.2,186.2],f:[186.5,186.5],ftN:90,ftF:90,ikA:[182,176],ikB:[180,176],ea:1},
+            props:[{k:"rect",x:20,y:150,w:42,h:33}],
+            steps:["Put your feet on a chair or step and your hands on the floor slightly wider than your shoulders.","Make a straight line from heels to head.","Lower your chest toward the floor with your elbows about 45° from your body.","Push back up without letting your hips sag."],
+            avoid:"Hips sagging or piking up. Squeeze your glutes."},
+  pullup:{A:{front:true,hip:[120,130],t:-90,ikA:[150,22],ikB:[90,22],ea:-1,eb:1,n:[90,90],f:[90,90],sl:.12,ftN:10,ftF:170},
+          B:{front:true,hip:[120,94],t:-90,ikA:[150,22],ikB:[90,22],ea:-1,eb:1,n:[90,90],f:[90,90],sl:.12,ftN:10,ftF:170},
+          vb:"0 0 240 215", ground:false,
+          props:[{k:"hbar",x1:62,x2:178,y:20},{k:"padJ",j:"kN",dx:-26,dy:0,w:36,h:7,z:"f"}],
+          steps:["Kneel on the assist pad and grip the bar a little wider than your shoulders.","Start from a full hang with your arms straight.","Pull your chest toward the bar by driving your elbows down to your sides.","Lower all the way down slowly. Less assist weight means harder."],
+          avoid:"Half reps. Full hang at the bottom, chin over the bar at the top."},
+  invrow:{A:{hip:[114.3,159.2],t:-11.3,n:[168.7,168.7],f:[169,169],ftN:-80,ftF:-80,ikA:[166,96],ikB:[164,96],ea:1},
+          B:{hip:[104.8,133.6],t:-29.5,n:[150.5,150.5],f:[151,151],ftN:-80,ftF:-80,ikA:[166,96],ikB:[164,96],ea:1},
+          props:[{k:"rect",x:160,y:86,w:80,h:8},{k:"line",x1:232,y1:94,x2:232,y2:183}],
+          steps:["Lie under a sturdy table and grip its edge with your hands about shoulder-width apart.","Straighten your body so only your heels touch the floor.","Pull your chest up to the table, squeezing your shoulder blades together.","Lower slowly. Bend your knees to make it easier."],
+          avoid:"Hips sagging. Keep a straight line from heels to shoulders."},
+  lateral:{A:{front:true,hip:[120,93],t:-90,ikN:[126,178],ikF:[114,178],ftN:10,ftF:170,a:[84,86],b:[96,94]},
+           B:{front:true,hip:[120,93],t:-90,ikN:[126,178],ikF:[114,178],ftN:10,ftF:170,a:[-2,4],b:[182,176]},
+           props:[{k:"db",j:"wN",z:"f"},{k:"db",j:"wF",z:"f"}],
+           steps:["Stand with light dumbbells at your sides, a slight bend in your elbows.","Raise your arms out to the sides, leading with your elbows.","Stop at shoulder height with your pinkies roughly level with your thumbs.","Lower slowly."],
+           avoid:"Shrugging or swinging. If you have to, the weight is too heavy."},
+  facepull:{A:{hip:[112,93],t:-92,ikN:[118,178],ikF:[106,178],ikA:[170,80],ikB:[168,80],ea:-1},
+            B:{hip:[112,93],t:-94,ikN:[118,178],ikF:[106,178],ikA:[132,60],ikB:[130,60],ea:-1},
+            props:[{k:"cable",x:222,y:72,j:"wN"}],
+            steps:["Set a rope on a cable at about head height and grip it with your thumbs pointing back.","Step back until your arms are straight.","Pull the rope toward your forehead, elbows high, pulling the ends apart.","Squeeze your shoulder blades for a second, then let it go back slowly."],
+            avoid:"Leaning back to move more weight."},
+  pullapart:{A:{front:true,hip:[120,93],t:-90,ikN:[126,178],ikF:[114,178],ftN:10,ftF:170,a:[0,0],b:[180,180],al:-0.22},
+             B:{front:true,hip:[120,93],t:-90,ikN:[126,178],ikF:[114,178],ftN:10,ftF:170,a:[0,0],b:[180,180],al:1},
+             props:[{k:"bandJ",j1:"wN",j2:"wF",z:"f"}],
+             steps:["Hold a light band in front of your chest with straight arms, hands shoulder-width apart.","Pull the band apart by moving your hands out to the sides.","Finish with the band touching your chest and your shoulder blades squeezed together.","Return slowly."],
+             avoid:"Shrugging your shoulders up."},
+  inclinecurl:{A:{hip:[118,140],t:242,ikN:[162,178],ikF:[160,178],a:[92,90],b:[91,89]},
+               B:{hip:[118,140],t:242,ikN:[162,178],ikF:[160,178],a:[92,-72],b:[91,-73]},
+               props:[{k:"line",x1:111,y1:154,x2:81,y2:96},{k:"line",x1:104,y1:150,x2:138,y2:150},{k:"line",x1:118,y1:150,x2:118,y2:183},{k:"db",j:"wN",z:"f"}],
+               steps:["Set a bench to about 60° and sit back with a dumbbell in each hand.","Let your arms hang straight down, slightly behind your body.","Curl the dumbbells up without moving your upper arms forward.","Lower slowly until your arms are fully straight again."],
+               avoid:"Your elbows swinging forward at the top."},
+  dips:{A:{hip:[121,104],t:-86,ikA:[130,108],ikB:[128,108],ea:1,n:[95,165],f:[96,166],ftN:150,ftF:150},
+        B:{hip:[110,142],t:-74,ikA:[130,108],ikB:[128,108],ea:1,n:[95,165],f:[96,166],ftN:150,ftF:150},
+        vb:"0 0 240 215", ground:false,
+        props:[{k:"line",x1:110,y1:110,x2:160,y2:110},{k:"padJ",j:"kN",dx:-14,dy:2,w:26,h:7,z:"f"}],
+        steps:["Kneel on the assist pad and hold the parallel bars with straight arms.","Lean your chest slightly forward.","Bend your elbows to lower yourself until your upper arms are about parallel to the floor.","Push back up to straight arms."],
+        avoid:"Going deeper than feels comfortable for your shoulders."},
+  cgpushup:{A:{hip:[118.5,141.1],t:-24,n:[156,156],f:[156.5,156.5],ftN:90,ftF:90,ikA:[172,176],ikB:[170,176],ea:1},
+            B:{hip:[125.7,169.1],t:-4.5,n:[175.5,175.5],f:[176,176],ftN:90,ftF:90,ikA:[172,176],ikB:[170,176],ea:1},
+            steps:["Set up in a push-up position with your hands just inside shoulder-width.","Keep your elbows tucked close to your ribs.","Lower your chest to just above the floor.","Press back up by straightening your arms. Drop to your knees if needed."],
+            avoid:"Elbows flaring out to the sides."},
+  carry:{A:{hip:[118,95],t:-90,ikN:[138,178],ikF:[100,176],ftF:20,a:[90,90],b:[80,70]},
+         B:{hip:[118,95],t:-90,ikN:[100,176],ikF:[138,178],ftN:20,ftF:0,a:[90,90],b:[100,110]},
+         loop:true, ms:1800,
+         props:[{k:"db",j:"wN",z:"f"}],
+         steps:["Pick up one heavy dumbbell or bag, like carrying a suitcase.","Stand perfectly tall. Don’t lean toward or away from the weight.","Walk slowly for the distance with short, controlled steps.","Set it down, switch hands and walk back."],
+         avoid:"Leaning sideways. Your shoulders should stay level."},
+  plank:{A:{hip:[110,153],t:-8,n:[165,165],f:[166,166],ftN:80,ftF:80,a:[90,0],b:[90,0]},
+         B:{hip:[110,150],t:-9,n:[163,163],f:[164,164],ftN:80,ftF:80,a:[90,0],b:[90,0]},
+         ms:4200,
+         steps:["Forearms on the floor, elbows under your shoulders.","Straighten your legs and make a line from head to heels.","Squeeze your glutes and brace like someone’s about to poke your stomach.","Breathe steadily and hold."],
+         avoid:"Hips sagging toward the floor."},
+  catcow:{A:{hip:[90,128],t:0,cv:-8,hd:-30,n:[90,180],f:[91,181],ftN:180,ftF:180,a:[90,90],b:[90,90]},
+          B:{hip:[90,124],t:0,cv:14,hd:60,n:[90,180],f:[91,181],ftN:180,ftF:180,a:[90,90],b:[90,90]},
+          ms:4400,
+          steps:["Start on hands and knees, hands under your shoulders, knees under your hips.","Breathe in as you let your belly drop and lift your chest and gaze (cow).","Breathe out as you round your back up toward the ceiling and tuck your chin (cat).","Move slowly through the whole spine."],
+          avoid:"Rushing. One slow breath per position."},
+  couch:{A:{anc:["kF",88,175],hip:[0,0],t:-72,f:[110,-90],ftF:-90,ikN:[150,178],a:[60,30],b:[62,32]},
+         B:{anc:["kF",88,175],hip:[0,0],t:-92,f:[124,-90],ftF:-90,ikN:[150,178],a:[75,30],b:[77,32]},
+         ms:4400,
+         props:[{k:"wall",x:83,y:110}],
+         steps:["Kneel with your back knee close to a wall or sofa and your back shin running up it.","Put your other foot forward in a lunge.","Squeeze the glute on the kneeling side and slowly bring your torso upright.","Hold the stretch at the front of your hip and thigh, then switch sides."],
+         avoid:"Arching your lower back to get upright. Squeeze the glute instead."}
+};
+// Exercise key → [gym figure, home figure]
+const FIGMAP = {
+  squat:["squat","goblet"], bss:["bss","bss"], legcurl:["legcurl","slidercurl"], calf:["calf","calf1"],
+  deadbug:["deadbug","deadbug"], sideplank:["sideplank","sideplank"], rdl:["rdl","dbrdl"], legpress:["legpress","stepup"],
+  hipthrust:["hipthrust","slhipthrust"], lunge:["lunge","lunge"], pallof:["pallof","pallof"], kneeraise:["kneeraise","revcrunch"],
+  bench:["bench","floorpress"], row:["csrow","onearmrow"], ohp:["ohpseat","ohpstand"], pulldown:["pulldown","bandpulldown"],
+  curl:["ezcurl","dbcurl"], pushdown:["pushdown","dbohtri"], abwheel:["abwheel","plankreach"], incline:["incline","fepushup"],
+  pullup:["pullup","invrow"], lateral:["lateral","lateral"], facepull:["facepull","pullapart"], inclinecurl:["inclinecurl","dbcurl"],
+  dips:["dips","cgpushup"], hammer:["hammer","hammer"], ohtri:["cableohtri","dbohtri"], carry:["carry","carry"]
+};
+// Drills inside checklists: text prefix → figure (or text-only guide)
+const DRILLS = [
+  ["Couch stretch","couch"],["Cat–cow","catcow"],["Plank","plank"],["Dead bug","deadbug"],["Side plank","sideplank"],
+  ["Thoracic rotations",{steps:["Lie on your side with your knees bent and stacked, arms straight out in front of you, palms together.","Keep your knees on the floor and sweep your top arm up and over to the other side, following your hand with your eyes.","Let your chest open toward the ceiling and breathe out at the end.","Bring the arm back. Do all reps, then switch sides."],avoid:"Letting your knees come apart. They anchor the stretch."}],
+  ["90/90 hip switches",{steps:["Sit on the floor with both knees bent at 90°, one leg in front of you and one to the side.","Sit tall, hands on the floor behind you if needed.","Lift both knees and rotate them to the other side, ending in the mirror position.","Go slowly, as far as your hips comfortably allow."],avoid:"Slumping. Sit tall through the whole movement."}]
+];
+
+/* ---------- How-to panels ---------- */
+const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const openHow = new Set();
+function figFor(exKey){ return FIGMAP[exKey][state.settings.mode === "home" ? 1 : 0]; }
+function howPanel(id, figKey, info, title, video){
+  const fig = figKey ? FIG[figKey] : null, data = info || fig;
+  let stage = "";
+  if(fig) stage = '<div class="stage"><svg viewBox="'+(fig.vb || "0 0 240 190")+'" data-fig="'+figKey+'" role="img" aria-label="Animated demonstration">'+(REDUCED ? fStatic(fig) : fFrame(fig,0))+"</svg></div>";
+  const vq = video || title, q = encodeURIComponent(vq + " exercise form");
+  return '<details class="howto" data-how="'+esc(id)+'"'+(openHow.has(id) ? " open" : "")+'><summary>'+(title ? esc(title) : "How to do it")+"</summary>" +
+    '<div class="howwrap'+(fig ? "" : " nofig")+'"'+(fig ? "" : ' style="grid-template-columns:1fr"')+">" + stage +
+    "<div><ol>" + data.steps.map(function(t){ return "<li>"+esc(t)+"</li>"; }).join("") + "</ol>" +
+    '<p class="avoid"><b>Avoid:</b> '+esc(data.avoid)+"</p>" +
+    (vq && fig ? '<a class="vid" href="https://www.youtube.com/results?search_query='+q+'" target="_blank" rel="noopener">Watch a video</a>' : "") +
+    "</div></div></details>";
+}
+function drillFor(text){
+  for(let i = 0; i < DRILLS.length; i++){ if(text.indexOf(DRILLS[i][0]) === 0) return DRILLS[i]; }
+  return null;
+}
+let animStart = null;
+function animate(ts){
+  if(animStart === null) animStart = ts;
+  document.querySelectorAll("details.howto[open] svg[data-fig]").forEach(function(svg){
+    const fig = FIG[svg.getAttribute("data-fig")];
+    svg.innerHTML = fFrame(fig, fPhase(ts - animStart, fig));
+  });
+  requestAnimationFrame(animate);
+}
+document.addEventListener("toggle", function(e){
+  const d = e.target; if(!d.classList || !d.classList.contains("howto")) return;
+  if(d.open) openHow.add(d.dataset.how); else openHow.delete(d.dataset.how);
+}, true);
+if(!REDUCED) requestAnimationFrame(animate);
 
 /* ---------- Render ---------- */
 function render(){
