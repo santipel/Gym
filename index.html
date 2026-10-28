@@ -14,6 +14,7 @@
   --brass:#9A6F25; --brass-soft:#F4EAD7; --sage:#3F6E4B; --sage-soft:#E1EDE3; --field:#F7F8FB;
   --display:"Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --body:"Atkinson Hyperlegible", "Segoe UI", Roboto, system-ui, sans-serif;
+  --mbase:#E3E7EE; --mfill:#C6CDD9;
   color-scheme: light;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
@@ -22,6 +23,7 @@
   :root{
     --bg:#0F1528; --surface:#172039; --ink:#E8EBF3; --muted:#9BA4B9; --line:#2B3655;
     --brass:#D8AE62; --brass-soft:#382F1E; --sage:#86BC92; --sage-soft:#1D3327; --field:#111A31;
+    --mbase:#22304F; --mfill:#34425F;
     color-scheme: dark;
   }
 }
@@ -147,7 +149,20 @@ section.block>h3{font-size:1.15rem;margin:0 0 .5rem}
 .howto summary::before{content:"";width:.55rem;height:.55rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
 .howto[open] summary::before{transform:rotate(45deg)}
 .howwrap{display:grid;grid-template-columns:minmax(0,13rem) 1fr;gap:.9rem;align-items:start;margin-top:.5rem}
-@media (max-width:520px){.howwrap{grid-template-columns:1fr}.howwrap .stage{max-width:16rem}}
+@media (max-width:520px){.howwrap{grid-template-columns:1fr}.howleft{max-width:18rem}}
+.howleft{display:grid;gap:.5rem;align-content:start}
+.mapstage{background:var(--field);border:1px solid var(--line);border-radius:.6rem;padding:.4rem}
+.mapstage svg{display:block;width:100%;height:auto;max-height:15rem}
+.mb{fill:var(--mbase)}
+.mbl{stroke:var(--mbase);stroke-linecap:round}
+.mu path{fill:var(--mfill);stroke:var(--field);stroke-width:1.2;stroke-linejoin:round}
+.mu.mp path{fill:var(--brass)}
+.mu.ms path{fill:var(--brass);fill-opacity:.4}
+.muslegend{list-style:none;margin:.45rem 0 0;padding:0;font-size:.85rem;display:grid;gap:.3rem}
+.muslegend li{display:flex;gap:.45rem;align-items:baseline}
+.sw{display:inline-block;width:.7rem;height:.7rem;border-radius:.2rem;flex:none;background:var(--brass)}
+.sw.ms{opacity:.4}
+.ex .works{margin:.2rem 0 0;font-size:.9rem;display:flex;gap:.4rem;align-items:baseline}
 .stage{background:var(--field);border:1px solid var(--line);border-radius:.6rem;padding:.25rem}
 .stage svg{display:block;width:100%;height:auto}
 .howwrap ol{margin:0;padding-left:1.2rem}
@@ -427,6 +442,12 @@ function unitInfo(u){
   if(u === "bw") return {a:"+kg", b:"reps"};
   return {a:"kg", b:"reps"};
 }
+function worksLine(key){
+  const m = MUS[key]; if(!m) return "";
+  const names = m.p.map(function(id){ return MUSCLES[id].s; });
+  const txt = names.length > 1 ? names.slice(0,-1).join(", ") + " and " + names[names.length-1] : names[0];
+  return '<p class="works"><span class="sw mp" aria-hidden="true"></span>Works your '+esc(txt)+"</p>";
+}
 function exCard(d, lf){
   const ex = EX[lf.ex], log = peekLog(d.iso), rows = (log && log.sets[lf.ex]) || [], ui = unitInfo(ex.u);
   const lt = lastTime(lf.ex, d.i);
@@ -449,6 +470,7 @@ function exCard(d, lf){
   }
   return '<article class="ex '+lf.kind+'"><h4>'+esc(exName(lf.ex))+'</h4>' +
     '<p class="rx">'+lf.sets+" × "+lf.reps+(lf.kind!=="core" ? ", RPE "+lf.rpe : "")+", rest "+lf.rest+"</p>" +
+    worksLine(figFor(lf.ex)) +
     (state.settings.mode === "home" ? "" : '<p class="cue">'+esc(ex.c)+'</p>') +
     lastTxt + '<div class="sets">'+sets+"</div>" + howPanel("ex-"+figFor(lf.ex), figFor(lf.ex), null, null, exName(lf.ex)) + "</article>";
 }
@@ -964,9 +986,179 @@ const FIGMAP = {
 // Drills inside checklists: text prefix → figure (or text-only guide)
 const DRILLS = [
   ["Couch stretch","couch"],["Cat–cow","catcow"],["Plank","plank"],["Dead bug","deadbug"],["Side plank","sideplank"],
-  ["Thoracic rotations",{steps:["Lie on your side with your knees bent and stacked, arms straight out in front of you, palms together.","Keep your knees on the floor and sweep your top arm up and over to the other side, following your hand with your eyes.","Let your chest open toward the ceiling and breathe out at the end.","Bring the arm back. Do all reps, then switch sides."],avoid:"Letting your knees come apart. They anchor the stretch."}],
-  ["90/90 hip switches",{steps:["Sit on the floor with both knees bent at 90°, one leg in front of you and one to the side.","Sit tall, hands on the floor behind you if needed.","Lift both knees and rotate them to the other side, ending in the mirror position.","Go slowly, as far as your hips comfortably allow."],avoid:"Slumping. Sit tall through the whole movement."}]
+  ["Thoracic rotations",{mus:"thoracic",steps:["Lie on your side with your knees bent and stacked, arms straight out in front of you, palms together.","Keep your knees on the floor and sweep your top arm up and over to the other side, following your hand with your eyes.","Let your chest open toward the ceiling and breathe out at the end.","Bring the arm back. Do all reps, then switch sides."],avoid:"Letting your knees come apart. They anchor the stretch."}],
+  ["90/90 hip switches",{mus:"ninety",steps:["Sit on the floor with both knees bent at 90°, one leg in front of you and one to the side.","Sit tall, hands on the floor behind you if needed.","Lift both knees and rotate them to the other side, ending in the mirror position.","Go slowly, as far as your hips comfortably allow."],avoid:"Slumping. Sit tall through the whole movement."}]
 ];
+
+/* ---------- Muscle maps ---------- */
+// Coordinates: front view centred on x=100, back view centred on x=300.
+// "l" paths are drawn on the left half and mirrored; "c" paths are drawn as-is (centre pieces).
+const MUSCLES = {
+  traps:{n:"Traps (upper trapezius)", s:"traps",
+    l:["M93 55 L77 63 L92 66 Z"],
+    c:["M300 50 L285 58 L271 66 L285 73 L300 70 L315 73 L329 66 L315 58 Z"]},
+  sdelt:{n:"Side shoulders (lateral delts)", s:"side shoulders",
+    l:["M73 63 C60 63 52 73 52 89 L57 94 C57 82 61 72 69 66 Z","M273 63 C260 63 252 73 252 89 L257 94 C257 82 261 72 269 66 Z"]},
+  fdelt:{n:"Front shoulders (anterior delts)", s:"front shoulders",
+    l:["M74 63 L70 66 C62 72 58 82 58 95 L63 98 C64 86 70 75 81 69 Z"]},
+  rdelt:{n:"Rear shoulders (posterior delts)", s:"rear shoulders",
+    l:["M274 63 L270 66 C262 72 258 82 258 95 L263 98 C264 86 270 75 283 71 Z"]},
+  chest:{n:"Chest (pectorals)", s:"chest",
+    l:["M99 70 L83 69 C71 74 65 86 65 98 C75 108 90 108 99 102 Z"]},
+  biceps:{n:"Biceps", s:"biceps",
+    l:["M57 99 C52 111 51 125 54 138 L63 138 C66 126 66 111 64 101 Z"]},
+  triceps:{n:"Triceps", s:"triceps",
+    l:["M257 99 C252 111 251 125 254 138 L263 138 C266 126 266 111 264 101 Z"]},
+  forearms:{n:"Forearms and grip", s:"forearms",
+    l:["M53 142 C47 160 45 176 46 190 L55 190 C58 174 62 158 64 142 Z","M253 142 C247 160 245 176 246 190 L255 190 C258 174 262 158 264 142 Z"]},
+  abs:{n:"Abs (rectus abdominis)", s:"abs",
+    l:["M89 110 h10 v14 h-10 Z","M89 126 h10 v14 h-10 Z","M89 142 h10 v14 h-10 Z","M90 158 h9 v20 h-7 Z"]},
+  obliques:{n:"Obliques (sides of the waist)", s:"obliques",
+    l:["M87 108 C79 109 73 116 73 128 C73 146 77 162 86 176 L87.5 176 Z"]},
+  lats:{n:"Lats (latissimus dorsi)", s:"lats",
+    l:["M282 80 C274 86 267 98 267 112 C271 134 282 152 296 164 L297 122 L286 101 Z"]},
+  upperback:{n:"Upper back (rhomboids, mid traps)", s:"upper back",
+    c:["M285 74 L300 71 L315 74 L314 101 L300 113 L286 101 Z"]},
+  lowback:{n:"Lower back (spinal erectors)", s:"lower back",
+    l:["M293 140 L299 137 L299 178 L291 178 C290 164 291 151 293 140 Z"]},
+  glutes:{n:"Glutes", s:"glutes",
+    l:["M299 180 C286 178 274 184 272 198 C272 214 284 224 299 222 Z"]},
+  quads:{n:"Quads (front of thigh)", s:"quads",
+    l:["M74 184 C67 204 65 232 69 262 C74 272 86 272 92 264 C95 240 96 210 95 190 Z"]},
+  adductors:{n:"Inner thighs (adductors)", s:"inner thighs",
+    l:["M96.5 192 C97 214 96 236 95 248 L99 244 L99 190 Z"]},
+  hams:{n:"Hamstrings (back of thigh)", s:"hamstrings",
+    l:["M274 226 C268 240 267 254 270 266 C276 273 288 273 296 266 C298 252 298 238 297 226 Z"]},
+  calves:{n:"Calves", s:"calves",
+    l:["M71 282 C66 300 67 328 73 352 L83 352 C88 328 89 300 87 282 Z","M271 282 C263 298 264 318 272 336 L287 336 C293 318 292 298 288 282 Z"]}
+};
+// Body underneath the muscles (left halves, mirrored)
+const BODY_L = [
+  ["path","M100 56 L74 63 L58 78 L56 100 L70 112 L72 178 L84 186 L100 188 Z"],
+  ["line",62,74,57,112,16],["line",57,112,51,190,13],["circle",49,200,7],
+  ["line",84,186,81,272,24],["line",81,272,78,358,17],["ellipse",77,370,11,6]
+];
+function mirrorX(view){ return view === "b" ? 600 : 200; }
+function bodyBase(){
+  let s = "";
+  ["f","b"].forEach(function(v){
+    const dx = v === "b" ? 200 : 0, mx = mirrorX(v);
+    s += '<ellipse class="mb" cx="'+(100+dx)+'" cy="30" rx="15" ry="19"/><rect class="mb" x="'+(92+dx)+'" y="46" width="16" height="14"/>';
+    [false,true].forEach(function(m){
+      const tf = m ? ' transform="matrix(-1 0 0 1 '+mx+' 0)"' : "";
+      s += "<g"+tf+">";
+      BODY_L.forEach(function(sh){
+        if(sh[0] === "path") s += '<path class="mb" d="'+sh[1]+'" transform="translate('+dx+' 0)"/>';
+        else if(sh[0] === "line") s += '<line class="mbl" x1="'+(sh[1]+dx)+'" y1="'+sh[2]+'" x2="'+(sh[3]+dx)+'" y2="'+sh[4]+'" stroke-width="'+sh[5]+'"/>';
+        else if(sh[0] === "circle") s += '<circle class="mb" cx="'+(sh[1]+dx)+'" cy="'+sh[2]+'" r="'+sh[3]+'"/>';
+        else s += '<ellipse class="mb" cx="'+(sh[1]+dx)+'" cy="'+sh[2]+'" rx="'+sh[3]+'" ry="'+sh[4]+'"/>';
+      });
+      s += "</g>";
+    });
+  });
+  return s;
+}
+function muscleShapes(id, cls){
+  const m = MUSCLES[id]; let s = '<g data-m="'+id+'" class="'+cls+'">';
+  (m.l || []).forEach(function(d){
+    const mx = d.match(/^M\s*(\d+)/) && +d.match(/^M\s*(\d+)/)[1] >= 200 ? 600 : 200;
+    s += '<path d="'+d+'"/><path d="'+d+'" transform="matrix(-1 0 0 1 '+mx+' 0)"/>';
+  });
+  (m.c || []).forEach(function(d){ s += '<path d="'+d+'"/>'; });
+  return s + "</g>";
+}
+let MBOX = null;
+function muscleBoxes(){
+  if(MBOX) return MBOX;
+  MBOX = {};
+  try{
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox","0 0 400 390"); svg.setAttribute("width","400"); svg.setAttribute("height","390");
+    svg.style.cssText = "position:absolute;left:-9999px;top:0;visibility:hidden";
+    svg.innerHTML = Object.keys(MUSCLES).map(function(id){ return muscleShapes(id,""); }).join("");
+    document.body.appendChild(svg);
+    svg.querySelectorAll("g[data-m]").forEach(function(g){ const b = g.getBBox(); MBOX[g.getAttribute("data-m")] = [b.x, b.y, b.x+b.width, b.y+b.height]; });
+    svg.remove();
+  } catch(e){}
+  return MBOX;
+}
+function mapViewBox(ids){
+  const B = muscleBoxes(); let x1 = 1e9, y1 = 1e9, x2 = -1e9, y2 = -1e9;
+  ids.forEach(function(id){ const b = B[id]; if(!b) return; x1 = Math.min(x1,b[0]); y1 = Math.min(y1,b[1]); x2 = Math.max(x2,b[2]); y2 = Math.max(y2,b[3]); });
+  if(x1 > x2) return "0 0 400 390";
+  const pad = 22; x1 -= pad; y1 -= pad; x2 += pad; y2 += pad;
+  let w = x2-x1, h = y2-y1, cx = (x1+x2)/2, cy = (y1+y2)/2;
+  w = Math.max(w, 150); h = Math.max(h, 130);
+  if(w/h > 2) h = w/2; if(h/w > 1.4) w = h/1.4;
+  x1 = Math.max(0, Math.min(400-w, cx-w/2)); y1 = Math.max(0, Math.min(390-h, cy-h/2));
+  return x1.toFixed(0)+" "+y1.toFixed(0)+" "+Math.min(w,400).toFixed(0)+" "+Math.min(h,390).toFixed(0);
+}
+function bodyMap(m){
+  const all = m.p.concat(m.s || []);
+  let s = bodyBase();
+  Object.keys(MUSCLES).forEach(function(id){
+    const cls = m.p.indexOf(id) >= 0 ? "mu mp" : (m.s || []).indexOf(id) >= 0 ? "mu ms" : "mu";
+    s += muscleShapes(id, cls);
+  });
+  return '<svg viewBox="'+mapViewBox(all)+'" role="img" aria-label="Muscles worked: '+all.map(function(id){ return MUSCLES[id].s; }).join(", ")+'">'+s+"</svg>";
+}
+function musList(ids){ return ids.map(function(id){ return MUSCLES[id].s; }).join(", "); }
+
+// What each movement works. p = main muscles, s = supporting. st = stretch/mobility rather than strength.
+const MUS = {
+  squat:{p:["quads","glutes"],s:["adductors","lowback","abs"]},
+  goblet:{p:["quads","glutes"],s:["adductors","abs","upperback"]},
+  bss:{p:["quads","glutes"],s:["adductors","hams"]},
+  legcurl:{p:["hams"],s:["calves"]},
+  slidercurl:{p:["hams"],s:["glutes","calves"]},
+  calf:{p:["calves"],s:[]}, calf1:{p:["calves"],s:[]},
+  deadbug:{p:["abs"],s:["obliques"]},
+  sideplank:{p:["obliques"],s:["abs","glutes"]},
+  rdl:{p:["hams","glutes"],s:["lowback","upperback","forearms"]},
+  dbrdl:{p:["hams","glutes"],s:["lowback","upperback","forearms"]},
+  legpress:{p:["quads","glutes"],s:["adductors"]},
+  stepup:{p:["quads","glutes"],s:["hams","calves"]},
+  hipthrust:{p:["glutes"],s:["hams"]}, slhipthrust:{p:["glutes"],s:["hams","obliques"]},
+  lunge:{p:["quads","glutes"],s:["adductors","hams","calves"]},
+  pallof:{p:["obliques","abs"],s:["glutes"]},
+  kneeraise:{p:["abs"],s:["obliques","forearms"]},
+  revcrunch:{p:["abs"],s:["obliques"]},
+  bench:{p:["chest"],s:["fdelt","triceps"]}, floorpress:{p:["chest"],s:["fdelt","triceps"]},
+  csrow:{p:["lats","upperback"],s:["rdelt","biceps","forearms"]},
+  onearmrow:{p:["lats","upperback"],s:["rdelt","biceps","forearms"]},
+  ohpseat:{p:["fdelt","sdelt"],s:["triceps","traps"]},
+  ohpstand:{p:["fdelt","sdelt"],s:["triceps","traps","abs"]},
+  pulldown:{p:["lats"],s:["biceps","upperback","forearms"]},
+  bandpulldown:{p:["lats"],s:["biceps","upperback"]},
+  ezcurl:{p:["biceps"],s:["forearms"]}, dbcurl:{p:["biceps"],s:["forearms"]},
+  hammer:{p:["biceps","forearms"],s:[]},
+  inclinecurl:{p:["biceps"],s:["forearms"]},
+  pushdown:{p:["triceps"],s:[]}, dbohtri:{p:["triceps"],s:[]}, cableohtri:{p:["triceps"],s:[]},
+  abwheel:{p:["abs"],s:["obliques","lats"]},
+  plankreach:{p:["abs"],s:["obliques","fdelt"]},
+  incline:{p:["chest","fdelt"],s:["triceps"]},
+  fepushup:{p:["chest","fdelt"],s:["triceps","abs"]},
+  pullup:{p:["lats"],s:["biceps","upperback","forearms"]},
+  invrow:{p:["upperback","lats"],s:["rdelt","biceps"]},
+  lateral:{p:["sdelt"],s:["traps"]},
+  facepull:{p:["rdelt","upperback"],s:["traps"]},
+  pullapart:{p:["rdelt","upperback"],s:["traps"]},
+  dips:{p:["triceps","chest"],s:["fdelt"]},
+  cgpushup:{p:["triceps","chest"],s:["fdelt","abs"]},
+  carry:{p:["obliques","forearms"],s:["traps","abs","glutes"]},
+  plank:{p:["abs"],s:["obliques","fdelt"]},
+  catcow:{p:["lowback","upperback"],s:["abs"],st:true},
+  couch:{p:["quads"],s:[],st:true},
+  thoracic:{p:["upperback"],s:["obliques","chest"],st:true},
+  ninety:{p:["glutes"],s:["adductors"],st:true}
+};
+function musclePanel(key){
+  const m = MUS[key]; if(!m) return "";
+  return '<div class="musmap"><div class="mapstage">'+bodyMap(m)+"</div>" +
+    '<ul class="muslegend"><li><span class="sw mp"></span><span><b>'+(m.st ? "Stretches" : "Main")+":</b> "+m.p.map(function(id){ return MUSCLES[id].n; }).join(", ")+"</span></li>" +
+    (m.s.length ? '<li><span class="sw ms"></span><span><b>'+(m.st ? "Also loosens" : "Also works")+":</b> "+m.s.map(function(id){ return MUSCLES[id].n; }).join(", ")+"</span></li>" : "") +
+    "</ul></div>";
+}
 
 /* ---------- How-to panels ---------- */
 const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -977,8 +1169,9 @@ function howPanel(id, figKey, info, title, video){
   let stage = "";
   if(fig) stage = '<div class="stage"><svg viewBox="'+(fig.vb || "0 0 240 190")+'" data-fig="'+figKey+'" role="img" aria-label="Animated demonstration">'+(REDUCED ? fStatic(fig) : fFrame(fig,0))+"</svg></div>";
   const vq = video || title, q = encodeURIComponent(vq + " exercise form");
+  const musKey = figKey || (info && info.mus), left = stage + (musKey ? musclePanel(musKey) : "");
   return '<details class="howto" data-how="'+esc(id)+'"'+(openHow.has(id) ? " open" : "")+'><summary>'+(title ? esc(title) : "How to do it")+"</summary>" +
-    '<div class="howwrap'+(fig ? "" : " nofig")+'"'+(fig ? "" : ' style="grid-template-columns:1fr"')+">" + stage +
+    '<div class="howwrap"'+(left ? "" : ' style="grid-template-columns:1fr"')+">" + (left ? '<div class="howleft">'+left+"</div>" : "") +
     "<div><ol>" + data.steps.map(function(t){ return "<li>"+esc(t)+"</li>"; }).join("") + "</ol>" +
     '<p class="avoid"><b>Avoid:</b> '+esc(data.avoid)+"</p>" +
     (vq && fig ? '<a class="vid" href="https://www.youtube.com/results?search_query='+q+'" target="_blank" rel="noopener">Watch a video</a>' : "") +
